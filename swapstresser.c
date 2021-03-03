@@ -7,8 +7,8 @@
 #include <sys/shm.h>
 #include <sys/stat.h>
 
-// this stupid program was written
-//   to check whether an unixoid system configuration catches out-of-memory situations gracefully
+// Swapstresser by (c) Stefan Blachmann 2018
+// to check whether an unixoid system configuration catches out-of-memory situations gracefully
 
 int       cycleduration = 1000;
 int       runcycles = 0;
@@ -62,7 +62,6 @@ void usage( void)
   fprintf(stderr, "  -s   if specified, stress memory every nth cycle,\n");
   fprintf(stderr, "       by accessing each allocated 4KiB page of chosen blocks\n");
   fprintf(stderr, "  -t   fraction of contiguous blocks to stress (1 = all)\n");
-/*  fprintf(stderr, "  -S   instead of conventional memory, allocate SYSV shared memory\n"); */
 }
 
 int allocblock( void)
@@ -79,11 +78,12 @@ int allocblock( void)
       else {
         ++blocksallocated;
         return 0;
-    } }
+      } 
+    }
     ++blockpp;
   }
-  // if it ever reaches here, the programmer is a proven retard
-  die ("??? allocblock()");
+  // NOTREACHED
+  die ("??? allocblock()");  // NOTREACHED
   return 1;     // dummy return to avoid warning
 }
 
@@ -104,7 +104,7 @@ int allocblock_shm( void)
     }
     ++seg_shm;
   }
-  // if it ever reaches here, the programmer is a proven retard
+  // NOTREACHED
   die ("??? allocblock_shm()");
   return 1;     // dummy return to avoid warning
 }
@@ -115,7 +115,7 @@ void freeblock( void)
   int       nth = rand() % blocksallocated;
   
   // free nth allocated block
-  for ( int n = 0; n < blocksmax; ++n)
+  for ( int n = 0; n < blocksmax; ++n) {
     if (*blockpp != NULL) {
       if (!nth) {
         free( *blockpp);
@@ -126,7 +126,8 @@ void freeblock( void)
         --nth;
     }
     ++blockpp;
-  // if it ever reaches here, the programmer is a proven retard
+  }
+  // NOTREACHED
   die ("??? freeblock()");
 }
 
@@ -136,7 +137,7 @@ void freeblock_shm( void)
   int  nth = rand() % blocksallocated_shm;
   
   // free nth allocated segment
-  for ( int n = 0; n < blocksmax_shm; ++n)
+  for ( int n = 0; n < blocksmax_shm; ++n) {
     if (*seg_shm != 0) {
       if (!nth) {
         shmctl (*seg_shm, IPC_RMID, NULL);
@@ -146,15 +147,21 @@ void freeblock_shm( void)
         --nth;
     }
     ++seg_shm;
-  // if it ever reaches here, the programmer is a proven retard
-  die ("??? freeblock()");
+  }
+  // NOTREACHED
+  die ("??? freeblock_shm()");
 }
 
 void stressblocks( void)
 {
   uint8_t **blockpp;
+  if (blocksallocated == 0) {
+    /* skip if not yet allocated */  
+    printf( "Stressing skipped, nothing allocated yet\n");
+    return;
+  }
   int startat = rand() % blocksallocated;
-  int num = rand() % (blocksallocated / stressfraction);
+  int num = 1;
   int n, ind, page;
   
   // walk through num blocks beginning at block startat, if necessary wrap around
@@ -163,7 +170,7 @@ void stressblocks( void)
   for (n = 0; n < num; ++n) {
     if (ind >= blocksallocated)
       ind -= blocksallocated;
-    // find the next allicated block
+    // find the next allocated block
     blockpp = blocks + ind;
     while (*blockpp == NULL) {
       // fast forward for next non-empty block
@@ -179,12 +186,18 @@ void stressblocks( void)
       ++*(*blockpp + (page << 12));
     }
     ++ind;
-} } 
+  } 
+} 
 
 void stressblocks_shm( void)
 {
   int *seg_shm;
   uint8_t *memp;
+  if (blocksallocated_shm == 0) {
+    /* skip if not yet allocated */  
+    printf( "SHM stressing skipped, nothing allocated yet\n");
+    return;
+  }
   int startat = rand() % blocksallocated_shm;
   int num = rand() % (blocksallocated_shm / stressfraction_shm);
   int n, ind, page;
@@ -195,7 +208,7 @@ void stressblocks_shm( void)
   for (n = 0; n < num; ++n) {
     if (ind >= blocksallocated_shm)
       ind -= blocksallocated_shm;
-    // find the next allicated block
+    // find the next allocated block
     seg_shm = segments_shm + ind;
     while (*seg_shm == 0) {
       // fast forward for next non-empty block
@@ -218,7 +231,8 @@ void stressblocks_shm( void)
     if (r)
       die( "shmdt() failed!");
     ++ind;
-} } 
+  }
+} 
 
 void die( char*msg)
 {
